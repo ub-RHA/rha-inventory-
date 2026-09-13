@@ -525,7 +525,7 @@
     margin-bottom: 5px;
   }
 
-  .field input, .field select {
+  .field input, .field select, .field textarea {
     width: 100%;
     border: 1.5px solid var(--border);
     background: var(--bg);
@@ -545,6 +545,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
+  .field-row-3col { grid-template-columns: 1fr 1fr 1fr; }
 
   .form-actions {
     display: flex;
@@ -624,6 +625,7 @@
   @media (max-width: 520px) {
     .home-stats { gap: 24px; }
     .field-row { grid-template-columns: 1fr; }
+    .field-row-3col { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -693,6 +695,10 @@
         <label for="f-name">Item name</label>
         <input id="f-name" type="text" placeholder="e.g. Drink dispenser" required>
       </div>
+      <div class="field">
+        <label for="f-description">Description (optional)</label>
+        <textarea id="f-description" rows="3" placeholder="Any details worth noting — size, how many people it needs to carry, quirks, etc."></textarea>
+      </div>
       <div class="field-row">
         <div class="field">
           <label for="f-category">Category</label>
@@ -716,28 +722,7 @@
       <div class="field-row">
         <div class="field">
           <label for="f-council">Hall council</label>
-          <select id="f-council" required>
-            <option value="" disabled selected>Select a council…</option>
-            <optgroup label="Hall & Village Councils">
-              <option>Fargo</option>
-              <option>Red Jacket</option>
-              <option>Richmond</option>
-              <option>Spaulding</option>
-              <option>Wilkeson</option>
-              <option>Governors</option>
-              <option>Greiner</option>
-              <option>Clement</option>
-              <option>Goodyear</option>
-              <option>Creekside Village</option>
-              <option>Flickinger Court</option>
-              <option>Flint Village</option>
-              <option>Hadley Village</option>
-              <option>South Lake Village</option>
-            </optgroup>
-            <optgroup label="RHA">
-              <option>RHA E-Board</option>
-            </optgroup>
-          </select>
+          <select id="f-council" required></select>
         </div>
         <div class="field">
           <label for="f-condition">Condition</label>
@@ -824,6 +809,15 @@ if (!firebaseReady) {
   document.getElementById('configBanner').style.display = 'block';
 }
 const CATEGORIES = ['All', 'Kitchen / Food-Related', 'Event Supplies', 'Sports / Rec', 'Furniture', 'Decor', 'Tech / Audio-Visual Devices', 'Arts & Crafts', 'Games / Activities', 'Other'];
+const COUNCILS = ['Fargo', 'Red Jacket', 'Richmond', 'Spaulding', 'Wilkeson', 'Governors', 'Greiner', 'Clement', 'Goodyear', 'Creekside Village', 'Flickinger Court', 'Flint Village', 'Hadley Village', 'South Lake Village'];
+
+function populateCouncilSelect(selectEl, includePlaceholder) {
+  let html = includePlaceholder ? '<option value="" disabled selected>Select a council…</option>' : '';
+  html += '<optgroup label="Hall & Village Councils">' + COUNCILS.map(c => `<option>${c}</option>`).join('') + '</optgroup>';
+  html += '<optgroup label="RHA"><option>RHA E-Board</option></optgroup>';
+  selectEl.innerHTML = html;
+}
+populateCouncilSelect(document.getElementById('f-council'), true);
 
 let items = [];
 let activeCategory = 'All';
@@ -1132,6 +1126,7 @@ function renderResults() {
         <span class="status-dot ${statusClass}">${statusLabel}</span>
       </div>
       <div class="item-tag mono">${escapeHtml(item.category)}</div>
+      ${item.description ? `<div class="item-line" style="margin-top:6px;">${escapeHtml(item.description.length > 90 ? item.description.slice(0, 90) + '…' : item.description)}</div>` : ''}
       <div class="item-line">${escapeHtml(item.council)} Hall Council · Qty ${escapeHtml(item.quantity || '1')} · ${escapeHtml(item.condition)} condition</div>
       ${item.link ? `<div class="item-line"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">View item link ↗</a></div>` : ''}
       <hr class="item-hr">
@@ -1254,6 +1249,7 @@ function openForm(options) {
     modalSub.textContent = 'Update the details below and save your changes.';
     submitBtn.textContent = 'Save changes';
     document.getElementById('f-name').value = item.name;
+    document.getElementById('f-description').value = item.description || '';
     document.getElementById('f-category').value = item.category;
     document.getElementById('f-quantity').value = item.quantity || '';
     document.getElementById('f-council').value = item.council;
@@ -1296,6 +1292,7 @@ itemForm.addEventListener('submit', async (e) => {
   formError.style.display = 'none';
 
   const name = document.getElementById('f-name').value.trim();
+  const description = document.getElementById('f-description').value.trim();
   const category = document.getElementById('f-category').value;
   const quantity = document.getElementById('f-quantity').value.trim();
   const council = document.getElementById('f-council').value.trim();
@@ -1318,7 +1315,7 @@ itemForm.addEventListener('submit', async (e) => {
     const existing = items.find(i => i.id === editingId);
     if (!existing) { submitBtn.disabled = false; closeForm(); return; }
     snapshot = { ...existing };
-    Object.assign(existing, { name, category, quantity, council, condition, contactRole, contactInfo, link, image: selectedImage });
+    Object.assign(existing, { name, description, category, quantity, council, condition, contactRole, contactInfo, link, image: selectedImage });
     submitBtn.textContent = 'Saving…';
     ok = await saveItems();
     submitBtn.disabled = false;
@@ -1338,7 +1335,7 @@ itemForm.addEventListener('submit', async (e) => {
 
   const newItem = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name, category, quantity, council, condition, contactRole, contactInfo, link,
+    name, description, category, quantity, council, condition, contactRole, contactInfo, link,
     image: selectedImage,
     status: 'available',
     createdAt: Date.now()
@@ -1403,6 +1400,7 @@ function openDetail(item) {
       <span class="status-dot ${statusClass}">${statusLabel}</span>
     </div>
     <div class="item-tag mono" style="margin-bottom:14px;">${escapeHtml(item.category)}</div>
+    ${item.description ? `<div class="field"><label>Description</label><div class="contact-line" style="white-space:pre-wrap;">${escapeHtml(item.description)}</div></div>` : ''}
 
     <div class="field"><label>Hall council</label><div class="contact-line">${escapeHtml(item.council)}</div></div>
     <div class="field-row">
